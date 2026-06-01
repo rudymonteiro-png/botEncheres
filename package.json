@@ -1,20 +1,24 @@
 {
-  "name": "webapp",
-  "type": "module",
+  "name": "sorare-bid-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Superviseur et pilote d'un bot d'encheres automatiques sur le marche primaire de Sorare (proxy GraphQL officiel, dry-run inclus).",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "wrangler pages dev",
-    "deploy": "npm run build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
-  },
-  "dependencies": {
-    "hono": "^4.12.12"
+    "install:all": "npm install",
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "build:backend": "npm --workspace backend run build",
+    "build:frontend": "npm --workspace frontend run build",
+    "start": "npm --workspace backend run start",
+    "test": "npm --workspace backend run test"
   },
   "devDependencies": {
-    "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.2",
-    "vite": "^6.3.5",
-    "wrangler": "^4.4.0"
+    "concurrently": "^9.1.0"
   }
 }

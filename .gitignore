@@ -1,33 +1,38 @@
-# prod
-dist/
-
-# dev
-.yarn/
-!.yarn/releases
-.vscode/*
-!.vscode/launch.json
-!.vscode/*.code-snippets
-.idea/workspace.xml
-.idea/usage.statistics.xml
-.idea/shelf
-
-# deps
+# Dependencies
 node_modules/
-.wrangler
+**/node_modules/
 
-# env
+# Builds
+dist/
+**/dist/
+frontend/dist/
+backend/dist/
+
+# Secrets - NE JAMAIS COMMITTER
 .env
-.env.production
-.dev.vars
+.env.*
+!.env.example
 
-# logs
+# Base de donnees SQLite (donnees locales)
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Logs
 logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+.pm2/
+pids/
+*.pid
 
-# misc
+# Divers
 .DS_Store
+*.tar.gz
+*.bak
+coverage/
+.vite/
