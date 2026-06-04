@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { BotState, ActionLog } from '../api/types';
+import { api } from '../api/client';
 
 /**
  * Hook WebSocket : recoit l'etat du bot et les nouvelles actions en temps reel.
@@ -53,6 +54,28 @@ export function useWebSocket(onAction: (a: ActionLog) => void) {
       wsRef.current?.close();
     };
   }, [connect]);
+
+  // Fallback REST : recupere l'etat initial immediatement, puis re-poll tant que
+  // le WebSocket n'est pas connecte (utile derriere un proxy/tunnel qui bloque le WS).
+  useEffect(() => {
+    let cancelled = false;
+    const fetchState = async () => {
+      try {
+        const s = await api.getState();
+        if (!cancelled) setState(s);
+      } catch {
+        /* noop */
+      }
+    };
+    void fetchState();
+    const t = setInterval(() => {
+      if (!connected) void fetchState();
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [connected]);
 
   return { state, connected };
 }

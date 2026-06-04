@@ -45,6 +45,13 @@ router.post('/bot/stop', (_req: Request, res: Response) => {
   res.json(botEngine.getState());
 });
 
+// Mode DEMO : injecte des donnees fictives pour visualiser le dashboard
+// sans connexion Sorare (aucun appel reseau, aucune enchere reelle).
+router.post('/demo/load', (_req: Request, res: Response) => {
+  botEngine.loadDemoData();
+  res.json(botEngine.getState());
+});
+
 // ===========================================================================
 //  Authentification Sorare (sans exposer de secret)
 // ===========================================================================

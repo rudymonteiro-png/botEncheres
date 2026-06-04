@@ -35,6 +35,7 @@ export const api = {
   startBot: () => req<BotState>('/bot/start', { method: 'POST' }),
   pauseBot: () => req<BotState>('/bot/pause', { method: 'POST' }),
   stopBot: () => req<BotState>('/bot/stop', { method: 'POST' }),
+  loadDemo: () => req<BotState>('/demo/load', { method: 'POST' }),
 
   // Auth
   authStatus: () => req<AuthStatus>('/auth/status'),

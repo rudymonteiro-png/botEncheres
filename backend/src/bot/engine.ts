@@ -336,6 +336,170 @@ class BotEngine {
       this.scheduleNext(0);
     }
   }
+
+  /**
+   * MODE DEMO : injecte des auctions fictives + decisions pour visualiser le
+   * dashboard sans connexion Sorare. N'effectue AUCUN appel reseau ni enchere.
+   */
+  loadDemoData(): void {
+    const now = Date.now();
+    const demoTargets = new Map<string, number>([
+      ['kylian-mbappe', 15000],
+      ['erling-haaland', 12000],
+      ['jude-bellingham', 8000],
+      ['vinicius-junior', 10000],
+    ]);
+
+    // On s'assure que ces cibles existent en base pour coherence UI.
+    for (const [slug, cap] of demoTargets) {
+      const existing = targetsRepo.list().find((t) => t.playerSlug === slug);
+      if (!existing) {
+        targetsRepo.create({
+          playerSlug: slug,
+          displayName: slug
+            .split('-')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' '),
+          maxPriceCents: cap,
+          enabled: true,
+        });
+      }
+    }
+
+    const demoAuctions: RawAuction[] = [
+      {
+        id: 'EnglishAuction:demo-1',
+        open: true,
+        endDate: new Date(now + 1000 * 60 * 8).toISOString(),
+        currentPrice: '9000',
+        minNextBid: '9500', // <= plafond 15000 -> enchere
+        playerSlug: 'kylian-mbappe',
+        playerName: 'Kylian Mbappé',
+        bestBidderSlug: 'rival-manager',
+        bidders: [
+          { bidderSlug: 'rival-manager', bidderNickname: 'RivalManager', amountCents: 9000 },
+          { bidderSlug: 'collector22', bidderNickname: 'Collector22', amountCents: 8500 },
+        ],
+      },
+      {
+        id: 'EnglishAuction:demo-2',
+        open: true,
+        endDate: new Date(now + 1000 * 60 * 3).toISOString(),
+        currentPrice: '13000',
+        minNextBid: '13500', // > plafond 12000 -> OVER_CAP
+        playerSlug: 'erling-haaland',
+        playerName: 'Erling Haaland',
+        bestBidderSlug: 'big-spender',
+        bidders: [{ bidderSlug: 'big-spender', bidderNickname: 'BigSpender', amountCents: 13000 }],
+      },
+      {
+        id: 'EnglishAuction:demo-3',
+        open: true,
+        endDate: new Date(now + 1000 * 60 * 12).toISOString(),
+        currentPrice: '6000',
+        minNextBid: '6500',
+        playerSlug: 'jude-bellingham',
+        playerName: 'Jude Bellingham',
+        bestBidderSlug: 'cheater-sniper', // blackliste dans la demo
+        bidders: [
+          { bidderSlug: 'cheater-sniper', bidderNickname: 'CheaterSniper', amountCents: 6000 },
+        ],
+      },
+      {
+        id: 'EnglishAuction:demo-4',
+        open: true,
+        endDate: new Date(now + 1000 * 60 * 20).toISOString(),
+        currentPrice: '7000',
+        minNextBid: '7500',
+        playerSlug: 'vinicius-junior',
+        playerName: 'Vinicius Junior',
+        bestBidderSlug: null,
+        bidders: [],
+      },
+    ];
+
+    // Blackliste le sniper pour la demo (idempotent).
+    const bl = blacklistRepo.list();
+    if (!bl.find((b) => b.userSlug === 'cheater-sniper')) {
+      blacklistRepo.create({ userSlug: 'cheater-sniper', note: 'Demo : sniper blacklisté' });
+    }
+
+    const blacklist = blacklistRepo.slugSet();
+    this.walletBalanceCents = 50000; // 500 € de solde fictif
+    this.walletKycStatus = 'OK';
+
+    const tracked: TrackedAuction[] = demoAuctions.map((auction) => {
+      const minNextBidCents = parsePriceToCents(auction.minNextBid);
+      const currentPriceCents = parsePriceToCents(auction.currentPrice);
+
+      const decision = decide({
+        auctionOpen: auction.open,
+        playerSlug: auction.playerSlug,
+        targets: demoTargets,
+        alreadyOwned: false,
+        bidders: auction.bidders,
+        blacklist,
+        bestBidderSlug: auction.bestBidderSlug,
+        mySlug: 'demo-me',
+        minNextBidCents,
+        walletBalanceCents: this.walletBalanceCents,
+      });
+
+      let status: AuctionTrackStatus = 'WATCHING';
+      let reason = decision.reason;
+
+      if (decision.shouldBid) {
+        status = 'IN_RACE';
+        reason = 'DRY_RUN';
+        this.logAction({
+          auction,
+          outcome: 'BID_SIMULATED',
+          reason: 'DRY_RUN',
+          currentPriceCents,
+          minNextBidCents,
+          maxPriceCents: decision.maxPriceCents,
+          bidAmountCents: decision.bidAmountCents,
+          dryRun: true,
+          message: `[DÉMO] Enchère simulée de ${decision.bidAmountCents}c (plafond ${decision.maxPriceCents}c)`,
+        });
+      } else {
+        status = 'ABSTAIN';
+        this.logAction({
+          auction,
+          outcome: decision.reason === 'OVER_CAP' ? 'OVER_CAP' : 'ABSTAIN',
+          reason: decision.reason,
+          currentPriceCents,
+          minNextBidCents,
+          maxPriceCents: decision.maxPriceCents,
+          bidAmountCents: null,
+          dryRun: true,
+          message: `[DÉMO] ${this.reasonMessage(decision.reason)}`,
+        });
+      }
+
+      return {
+        auctionId: auction.id,
+        playerSlug: auction.playerSlug ?? '',
+        playerName: auction.playerName ?? 'Inconnu',
+        currentPriceCents,
+        minNextBidCents,
+        maxPriceCents: decision.maxPriceCents,
+        endDate: auction.endDate,
+        open: auction.open,
+        bestBidderSlug: auction.bestBidderSlug,
+        iAmLeading: false,
+        status,
+        reason,
+        bidders: auction.bidders,
+        lastEvaluatedAt: new Date().toISOString(),
+      };
+    });
+
+    this.trackedAuctions = tracked;
+    this.lastPollAt = new Date().toISOString();
+    this.broadcastState();
+    logger.info('Donnees de demo chargees', { auctions: tracked.length });
+  }
 }
 
 export const botEngine = new BotEngine();

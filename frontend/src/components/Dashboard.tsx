@@ -94,6 +94,14 @@ export function Dashboard({ state, connected }: { state: BotState | null; connec
           >
             ⏹ Arrêter
           </button>
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() => action(api.loadDemo)}
+            title="Injecte des auctions fictives pour visualiser l'interface sans connexion Sorare"
+          >
+            🎬 Charger la démo
+          </button>
           <div className="spacer" />
           <span className="muted">
             Intervalle de polling : {state ? `${state.pollIntervalMs / 1000}s` : '—'} ·{' '}
